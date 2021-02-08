@@ -1,0 +1,70 @@
+name: build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "*"
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Restore Go cache
+        uses: actions/cache@v1
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15.x
+      - name: Setup Kubernetes
+        uses: engineerd/setup-kind@v0.5.0
+      - name: Setup Helm
+        uses: fluxcd/pkg/actions/helm@main
+      - name: Setup Kustomize
+        uses: fluxcd/pkg/actions/kustomize@main
+      - name: Setup Kubebuilder
+        uses: fluxcd/pkg/actions/kubebuilder@main
+      - name: Setup Kubectl
+        uses: fluxcd/pkg/actions/kubectl@main
+      - name: Run tests
+        run: make test
+        env:
+          KUBEBUILDER_ASSETS: ${{ github.workspace }}/kubebuilder/bin
+      - name: Check if working tree is dirty
+        run: |
+          if [[ $(git diff --stat) != '' ]]; then
+            git --no-pager diff
+            echo 'run make test and commit changes'
+            exit 1
+          fi
+      - name: Install from local image
+        run: ./.github/install.sh helm
+        env:
+          KUBEBUILDER_ASSETS: ${{ github.workspace }}/kubebuilder/bin
+      - name: Run e2e tests
+        run: ./.github/e2e-tests.sh
+        env:
+          KUBEBUILDER_ASSETS: ${{ github.workspace }}/kubebuilder/bin
+      - name: Logs
+        continue-on-error: true
+        run: |
+          kubectl -n k8s-gitops-secrets-system logs deploy/k8s-gitops-secrets-controller-manager
+      - name: Debug failure
+        continue-on-error: true
+        if: failure()
+        run: |
+          which kubectl
+          kubectl version
+          kubectl -n k8s-gitops-secrets-system get all
+          kubectl -n k8s-gitops-secrets-system logs deploy/k8s-gitops-secrets-controller-manager
+      - name: Build seals CLI for all platforms
+        run: make cli
