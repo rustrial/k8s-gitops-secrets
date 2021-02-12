@@ -25,6 +25,8 @@ serviceAccount:
 
 podAnnotations: {}
 
+podLabels: {}
+
 # Set to true to run controller in single namespace mode. By default the controller
 # will run in cluster scope.
 namespaced: false
@@ -32,8 +34,7 @@ namespaced: false
 extraArgs: []
 
 podSecurityContext:
-  {}
-  # fsGroup: 2000
+  fsGroup: 1000
 
 securityContext:
   capabilities:
@@ -42,7 +43,7 @@ securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   runAsNonRoot: true
-  runAsUser: 65532
+  runAsUser: 1000
   runAsGroup: 1000
 
 resources:
@@ -60,3 +61,5 @@ tolerations: []
 affinity: {}
 
 topologySpreadConstraints: {}
+
+priorityClassName:

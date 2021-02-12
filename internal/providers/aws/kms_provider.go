@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -20,17 +19,26 @@ import (
 
 // KmsProviderFactory implementation.
 type KmsProviderFactory struct {
-	config aws.Config
+	config  aws.Config
+	pattern *regexp.Regexp
 }
 
+func pattern() *regexp.Regexp {
+	return regexp.MustCompile(`^arn:aws:kms:([^:]+):[^:]+:(key|alias)/.+$`)
+}
+
+// NewKmsProviderFactory creates new KmsProviderFactory instance.
 func NewKmsProviderFactory(config aws.Config) *KmsProviderFactory {
+	pattern := pattern()
 	return &KmsProviderFactory{
 		config,
+		pattern,
 	}
 }
 
+// NewProvider creates new DecryptionProvider instance.
 func (p *KmsProviderFactory) NewProvider(ctx context.Context, provider *secretsv1beta1.Provider) (providers.DecryptionProvider, error) {
-	if provider.AwsKms != nil && strings.HasPrefix(provider.KeyEncryptionKeyID, "arn:aws:kms:") {
+	if provider.AwsKms != nil && p.pattern.MatchString(provider.KeyEncryptionKeyID) {
 		return NewKmsProvider(p.config.Copy()), nil
 	}
 	return nil, nil
@@ -48,7 +56,7 @@ type KmsProvider struct {
 
 // NewKmsProvider instance.
 func NewKmsProvider(config aws.Config) *KmsProvider {
-	pattern := regexp.MustCompile(`^arn:aws:kms:([^:]+):[^:]+:(key|alias)/.+$`)
+	pattern := pattern()
 	return &KmsProvider{
 		config,
 		pattern,

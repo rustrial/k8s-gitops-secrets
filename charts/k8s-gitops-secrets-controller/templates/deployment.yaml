@@ -19,7 +19,13 @@ spec:
       {{- end }}
       labels:
         {{- include "k8s-gitops-secrets-controller.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podLabels }}  
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
+      {{- if .Values.priorityClassName }}
+      priorityClassName: "{{ .Values.priorityClassName }}"
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
