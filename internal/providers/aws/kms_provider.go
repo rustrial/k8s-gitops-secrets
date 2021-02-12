@@ -48,7 +48,7 @@ type KmsProvider struct {
 
 // NewKmsProvider instance.
 func NewKmsProvider(config aws.Config) *KmsProvider {
-	pattern := regexp.MustCompile(`^arn:aws:kms:([^:]+):[^:]+:key/.+$`)
+	pattern := regexp.MustCompile(`^arn:aws:kms:([^:]+):[^:]+:(key|alias)/.+$`)
 	return &KmsProvider{
 		config,
 		pattern,
@@ -110,6 +110,11 @@ func (p *KmsProvider) encryptV1(ctx context.Context, svc *kms.Client, plainText 
 	kp, err := p.kmsGenerateDataKey(ctx, svc, arn)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating AWS KMS DataKey: %w", err)
+	}
+	// Input ARN might be a KMS Key alias, but we have to store a specific
+	// (immutable) ARN, so let's use the ARN (KeyId) as returned by GenerateDataKey.
+	if kp.KeyId != nil && len(*kp.KeyId) > 0 {
+		arn = *kp.KeyId
 	}
 	block, err := aes.NewCipher(kp.Plaintext)
 	if err != nil {
