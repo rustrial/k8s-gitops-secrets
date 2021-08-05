@@ -26,3 +26,4 @@ testbin/*
 *~
 
 .kube-config
+.dccache

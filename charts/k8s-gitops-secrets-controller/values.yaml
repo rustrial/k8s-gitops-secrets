@@ -33,6 +33,10 @@ namespaced: false
 
 extraArgs: []
 
+extraEnv: []
+# - name: var_name
+#   value: var_value
+
 podSecurityContext:
   fsGroup: 1000
 

@@ -19,6 +19,7 @@ package secrets
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -121,7 +122,25 @@ func (r *SealedSecretReconciler) reconcile(ctx context.Context, sealedSecret *se
 				}
 			}
 		} else {
-			err = r.Patch(ctx, secret, client.MergeFrom(latest), &client.PatchOptions{FieldManager: fieldManager})
+			// Long-term we want to move-on to server side apply, but we have to introduce
+			// it softly making sure we are not breaking any existing installations. Thus
+			// we start with an opt-in phase during which JSON MergePatch will stay the default
+			// and if there are no problems we might in a later release switch to an opt-out
+			// approach where server side apply will become the default.
+			patchStrategy := os.Getenv("PATCH_STRATEGY")
+			switch patchStrategy {
+			case "ServerSideApply":
+				po := &client.PatchOptions{FieldManager: fieldManager}
+				po.ApplyOptions([]client.PatchOption{client.ForceOwnership})
+				err = r.Patch(ctx, secret, client.Apply, po)
+				break
+			default:
+				// Make sure we retain (do not remove) any finalizers added to the Secret by other
+				// controllers.
+				secret.ObjectMeta.Finalizers = latest.ObjectMeta.Finalizers
+				err = r.Patch(ctx, secret, client.MergeFrom(latest), &client.PatchOptions{FieldManager: fieldManager})
+				break
+			}
 			if err == nil {
 				msg := fmt.Sprintf("Patched %s %s/%s", secret.Kind, secret.Namespace, secret.Name)
 				r.Log.Info(msg)
