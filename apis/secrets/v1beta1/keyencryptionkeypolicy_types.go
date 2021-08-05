@@ -54,6 +54,7 @@ type KeyEncryptionKeyPolicyStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:categories=all
 
 // KeyEncryptionKeyPolicy is the Schema for the keyencryptionkeypolicies API
 type KeyEncryptionKeyPolicy struct {

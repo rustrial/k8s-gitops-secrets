@@ -64,7 +64,14 @@ jobs:
         run: |
           which kubectl
           kubectl version
-          kubectl -n k8s-gitops-secrets-system get all
+          echo "-----------------------------------------------"
+          kubectl -n k8s-gitops-secrets-system get all || true
+          echo "-----------------------------------------------"
+          kubectl -n k8s-gitops-secrets-system get sealedsecrets/aws-kms-secret -o yaml || true
+          echo "-----------------------------------------------"
+          kubectl -n k8s-gitops-secrets-system get pods -o yaml || true
+          echo "-----------------------------------------------"
           kubectl -n k8s-gitops-secrets-system logs deploy/k8s-gitops-secrets-controller-manager
+          echo "-----------------------------------------------"
       - name: Build seals CLI for all platforms
         run: make cli

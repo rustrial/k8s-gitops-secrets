@@ -170,6 +170,7 @@ type SealedSecretStatus struct {
 //+kubebuilder:printcolumn:name="Authorized",type="string",JSONPath=".status.conditions[?(@.type==\"Authorized\")].status",description="Whether all Key Encryption Keys references are authorized for this namespace"
 //+kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Ready"
 //+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description="Status message"
+//+kubebuilder:categories=all
 
 // SealedSecret is the Schema for the sealedsecrets API
 type SealedSecret struct {
