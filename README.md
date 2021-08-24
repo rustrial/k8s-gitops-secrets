@@ -4,7 +4,7 @@
 
 # Kubernetes GitOps Secrets
 
-Secure, easy-to-use and GitOps ready Kubernetes `Secret`s management using evelope
+Secure, easy-to-use and GitOps ready Kubernetes `Secret`s management using envelope
 encrypted `SealedSecret` objects, which can be stored in Git repositories.
 The solution is based on two software components:
 
@@ -68,7 +68,7 @@ spec:
 ## Controller
 
 The controller can be operated in cluster or namespace scoped mode. In cluster scope mode
-it willtrack `SealedSecret` objects in all namespaces and in namespaced mode it will only
+it will track `SealedSecret` objects in all namespaces and in namespaced mode it will only
 track objects in one specific namespace. To enable namespaces mode use the `--namespace`
 command line flag (e.g. `--namespace my-namespace`).
 
@@ -86,12 +86,12 @@ _Envelope encrypting is provider specific and for demonstration purpose we use
 the AWS KMS provider. Please consult the provider specific documentation
 (see above) for instructions for your encryption provider._
 
-Use the `aws-kms` subcommand of the `seals` command line tool to encrypt data. It expects one of several
+Use the `aws-kms` subcommand of the `seals` command line tool to encrypt data. It expects one or several
 AWD KMS _CMK_ ARNs and will read the secret data from `STDIN` and output the encrypted Envelopes as YAML
 array on `STDOUT`.
 
 ```shell
-cat my-secret.txt | seals arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000
+cat my-secret.txt | seals aws-kms arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000
 ```
 
 **Example output**
@@ -120,6 +120,11 @@ metadata:
   name: sealedsecret-sample
   namespace: default
 spec:
+  # Optional metadata
+  metadata:
+    labels:
+      mylabel: my-label-value
+  type: opaque
   # Plaintext entries
   data:
     some-non-sensitive-data: SSBhbSBub3QgYSBzZWNyZXQgOi0pCg==
@@ -151,7 +156,10 @@ kind: Secret
 metadata:
   name: sealedsecret-sample
   namespace: default
+  labels:
+    mylabel: my-label-value
 spec:
+  type: opaque
   data:
     some-non-sensitive-data: SSBhbSBub3QgYSBzZWNyZXQgOi0pCg==
     my-secret: d29ybGQK
