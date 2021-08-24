@@ -158,13 +158,12 @@ metadata:
   namespace: default
   labels:
     mylabel: my-label-value
-spec:
-  type: opaque
-  data:
-    some-non-sensitive-data: SSBhbSBub3QgYSBzZWNyZXQgOi0pCg==
-    my-secret: d29ybGQK
-  stringData:
-    more-non-sensitive-data: "I am not a secret either :-)"
+type: opaque
+data:
+  some-non-sensitive-data: SSBhbSBub3QgYSBzZWNyZXQgOi0pCg==
+  my-secret: d29ybGQK
+stringData:
+  more-non-sensitive-data: "I am not a secret either :-)"
 ```
 
 ## Getting Started
