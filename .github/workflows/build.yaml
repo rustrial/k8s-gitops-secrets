@@ -24,24 +24,32 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16.x
+          go-version: 1.18.x
       - name: Setup Kubernetes
         uses: engineerd/setup-kind@v0.5.0
         with:
-          version: "v0.11.1"
-          image: "kindest/node:v1.19.11@sha256:07db187ae84b4b7de440a73886f008cf903fcf5764ba8106a9fd5243d6f32729"
+          version: "v0.12.0"
+          image: "kindest/node:v1.23.4@sha256:0e34f0d0fd448aa2f2819cfd74e99fe5793a6e4938b328f657c8e3f81ee0dfb9"
       - name: Setup Helm
         uses: fluxcd/pkg/actions/helm@main
+        with:
+          version: "3.8.1"
       - name: Setup Kustomize
         uses: fluxcd/pkg/actions/kustomize@main
+        with:
+          version: "4.5.4"
       - name: Setup Kubebuilder
-        uses: fluxcd/pkg/actions/kubebuilder@main
+        uses: RyanSiu1995/kubebuilder-action@v1.2
+        with:
+          version: "3.3.0"
       - name: Setup Kubectl
         uses: fluxcd/pkg/actions/kubectl@main
+        with:
+          version: "1.23.4"
       - name: Run tests
         run: make test
         env:
-          KUBEBUILDER_ASSETS: ${{ github.workspace }}/kubebuilder/bin
+          KUBEBUILDER_ASSETS: /usr/local/kubebuilder/bin
       - name: Check if working tree is dirty
         run: |
           if [[ $(git diff --stat) != '' ]]; then
@@ -52,11 +60,11 @@ jobs:
       - name: Install from local image
         run: ./.github/install.sh helm
         env:
-          KUBEBUILDER_ASSETS: ${{ github.workspace }}/kubebuilder/bin
+          KUBEBUILDER_ASSETS: /usr/local/kubebuilder/bin
       - name: Run e2e tests
         run: ./.github/e2e-tests.sh
         env:
-          KUBEBUILDER_ASSETS: ${{ github.workspace }}/kubebuilder/bin
+          KUBEBUILDER_ASSETS: /usr/local/kubebuilder/bin
       - name: Logs
         continue-on-error: true
         run: |
