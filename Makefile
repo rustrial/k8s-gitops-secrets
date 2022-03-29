@@ -30,7 +30,8 @@ seals:
 cli: 
 	GOOS=darwin GOARCH=amd64 go build -o build/darwin/amd64/seals cmd/seals/main.go
 	cat build/darwin/amd64/seals | gzip > build/darwin/amd64/seals.gz
-	#GOOS=darwin GOARCH=arm64 go build -o build/darwin/arm/seals cmd/seals/main.go
+	GOOS=darwin GOARCH=arm64 go build -o build/darwin/arm64/seals cmd/seals/main.go
+	cat build/darwin/arm64/seals | gzip > build/darwin/arm64/seals.gz
 	GOOS=windows GOARCH=amd64 go build -o build/windows/amd64/seals.exe cmd/seals/main.go
 	zip build/windows/amd64/seals.zip build/windows/amd64/seals.exe
 	GOOS=linux GOARCH=amd64 go build -o build/linux/amd64/seals cmd/seals/main.go
