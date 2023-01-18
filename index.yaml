@@ -44,6 +44,58 @@ entries:
             - default
       artifacthub.io/license: Apache-2.0
     apiVersion: v2
+    appVersion: 0.0.7-RC3
+    created: "2023-01-18T17:05:55.707085274Z"
+    description: Kubernetes operator for GitOps SealedSecrets.
+    digest: 95ef011605db94d4ed502650e5dedc823f3db34dd339243c8055a77731c056f7
+    name: rustrial-k8s-gitops-secrets-controller
+    type: application
+    urls:
+    - https://github.com/rustrial/k8s-gitops-secrets/releases/download/rustrial-k8s-gitops-secrets-controller-0.0.7-RC3/rustrial-k8s-gitops-secrets-controller-0.0.7-RC3.tgz
+    version: 0.0.7-RC3
+  - annotations:
+      artifacthub.io/crds: |
+        - kind: SealedSecret
+          version: v1beta1
+          name: sealedsecret
+          displayName: GitOps SealedSecrets
+          description: GitOps SealedSecrets
+        - kind: KeyEncryptionKeyPolicy
+          version: v1beta1
+          name: keyencryptionkeypolicy
+          displayName: Key Encryption Key (KEK) Policy
+          description: Key Encryption Key (KEK) Policy use to authorize namespaces to use KEK.
+      artifacthub.io/crdsExamples: |
+        - apiVersion: secrets.rustrial.org/v1beta1
+          kind: SealedSecret
+          metadata:
+            name: sealedsecret-sample
+            namespace: default
+          spec:
+            metadata:
+              labels:
+                my-label: label-value
+              annotations:
+                my-annotation: annotation-value
+            encryptedData:
+              hello:
+              - keyEncryptionKeyId: arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000
+                awsKms:
+                  encryptionAlgorithm: AES_256
+                  nonce: hzxJEnrPLXq11FVw
+                  version: 1
+                cipherText: IxgpY1AVDdajA7LhZoJK63hLc+ko
+                dataEncryptionKey: QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=
+        - apiVersion: secrets.rustrial.org/v1beta1
+          kind: KeyEncryptionKeyPolicy
+          metadata:
+            name: keyencryptionkey-sample-1
+          spec:
+            keyEncryptionKeyId: arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000
+            namespaces:
+            - default
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
     appVersion: 0.0.7-RC1
     created: "2023-01-18T15:45:49.943925936Z"
     description: Kubernetes operator for GitOps SealedSecrets.
