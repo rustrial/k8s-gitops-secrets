@@ -12,8 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/rustrial/k8s-gitops-secrets/apis/secrets/v1beta1"
-	secretsv1beta1 "github.com/rustrial/k8s-gitops-secrets/apis/secrets/v1beta1"
+	"github.com/rustrial/k8s-gitops-secrets/api/secrets/v1beta1"
+	secretsv1beta1 "github.com/rustrial/k8s-gitops-secrets/api/secrets/v1beta1"
 	"github.com/rustrial/k8s-gitops-secrets/internal/providers"
 )
 

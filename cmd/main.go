@@ -1,5 +1,5 @@
 /*
-Copyright 2021.
+Copyright 2023.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,12 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/aws/aws-sdk-go-v2/config"
-	secretsv1beta1 "github.com/rustrial/k8s-gitops-secrets/apis/secrets/v1beta1"
+	secretsv1beta1 "github.com/rustrial/k8s-gitops-secrets/api/secrets/v1beta1"
+	secretscontroller "github.com/rustrial/k8s-gitops-secrets/internal/controller/secrets"
 	"github.com/rustrial/k8s-gitops-secrets/internal/providers"
 	awsProvider "github.com/rustrial/k8s-gitops-secrets/internal/providers/aws"
-
-	//rustrialorgv1beta1 "github.com/rustrial/k8s-gitops-secrets/apis/v1beta1"
-	secretscontrollers "github.com/rustrial/k8s-gitops-secrets/controllers/secrets"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -52,6 +50,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
 	utilruntime.Must(secretsv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -89,6 +88,17 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "e6233917cd37-controller-secrets-rustrial-org",
+		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
+		// when the Manager ends. This requires the binary to immediately end when the
+		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
+		// speeds up voluntary leader transitions as the new leader don't have to wait
+		// LeaseDuration time first.
+		//
+		// In the default scaffold provided, the program ends immediately after
+		// the manager stops, so would be fine to enable this option. However,
+		// if you are doing or is intended to do any operation such as perform cleanups
+		// after the manager stops then its usage might be unsafe.
+		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -100,7 +110,7 @@ func main() {
 		panic(err)
 	}
 
-	if err = (&secretscontrollers.SealedSecretReconciler{
+	if err = (&secretscontroller.SealedSecretReconciler{
 		Client:              mgr.GetClient(),
 		Log:                 ctrl.Log.WithName("controllers").WithName("secrets").WithName("SealedSecret"),
 		Scheme:              mgr.GetScheme(),
@@ -112,11 +122,11 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("check", healthz.Ping); err != nil {
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
