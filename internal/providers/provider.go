@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	secretsv1beta1 "github.com/rustrial/k8s-gitops-secrets/apis/secrets/v1beta1"
+	secretsv1beta1 "github.com/rustrial/k8s-gitops-secrets/api/secrets/v1beta1"
 )
 
 var providerFactories []ProviderFactory = make([]ProviderFactory, 0)

@@ -181,7 +181,7 @@ The data-key is either encrypted using envelope encryption provided by the Provi
 </div>
 </div>
 <h3 id="secrets.rustrial.org/v1beta1.Envelopes">Envelopes
-(<code>[]./apis/secrets/v1beta1.Envelope</code> alias)</h3>
+(<code>[]./api/secrets/v1beta1.Envelope</code> alias)</h3>
 <p>
 (<em>Appears on:</em>
 <a href="#secrets.rustrial.org/v1beta1.SealedSecretSpec">SealedSecretSpec</a>)
@@ -480,7 +480,7 @@ data value here. Described in <a href="https://tools.ietf.org/html/rfc4648#secti
 <code>encryptedData</code><br>
 <em>
 <a href="#secrets.rustrial.org/v1beta1.Envelopes">
-map[string]./apis/secrets/v1beta1.Envelopes
+map[string]./api/secrets/v1beta1.Envelopes
 </a>
 </em>
 </td>
@@ -612,7 +612,7 @@ data value here. Described in <a href="https://tools.ietf.org/html/rfc4648#secti
 <code>encryptedData</code><br>
 <em>
 <a href="#secrets.rustrial.org/v1beta1.Envelopes">
-map[string]./apis/secrets/v1beta1.Envelopes
+map[string]./api/secrets/v1beta1.Envelopes
 </a>
 </em>
 </td>
@@ -692,7 +692,7 @@ Kubernetes core/v1.SecretType
 <code>authorizations</code><br>
 <em>
 <a href="#secrets.rustrial.org/v1beta1.Authorization">
-map[string]./apis/secrets/v1beta1.Authorization
+map[string]./api/secrets/v1beta1.Authorization
 </a>
 </em>
 </td>

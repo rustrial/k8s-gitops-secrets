@@ -9,7 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/ghodss/yaml"
-	"github.com/rustrial/k8s-gitops-secrets/apis/secrets/v1beta1"
+	"github.com/rustrial/k8s-gitops-secrets/api/secrets/v1beta1"
 	awsProvider "github.com/rustrial/k8s-gitops-secrets/internal/providers/aws"
 	"github.com/spf13/cobra"
 )

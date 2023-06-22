@@ -25,7 +25,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/go-multierror"
-	secretsv1beta1 "github.com/rustrial/k8s-gitops-secrets/apis/secrets/v1beta1"
+	secretsv1beta1 "github.com/rustrial/k8s-gitops-secrets/api/secrets/v1beta1"
 	"github.com/rustrial/k8s-gitops-secrets/internal/providers"
 	apiCoreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -382,8 +381,7 @@ func (r *SealedSecretReconciler) reconcileDelete(ctx context.Context, sealedSecr
 // Unfortunately, I have not yet figured out whether we can index fields in arrays
 // using `mgr.GetFieldIndexer().IndexField(...)`, therefore we have to rely on this
 // brute force lookup.
-func (r *SealedSecretReconciler) findAffectedSecrets(object client.Object) []reconcile.Request {
-	ctx := context.TODO()
+func (r *SealedSecretReconciler) findAffectedSecrets(ctx context.Context, object client.Object) []reconcile.Request {
 	var kek secretsv1beta1.KeyEncryptionKeyPolicy
 	key := client.ObjectKeyFromObject(object)
 	sealedSecrets := make([]reconcile.Request, 0)
@@ -444,12 +442,12 @@ func (r *SealedSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return e.Object.GetNamespace() == r.ControllerNamespace
 		},
 	}
-	mapper := func(object client.Object) []reconcile.Request {
-		return r.findAffectedSecrets(object)
+	mapper := func(context context.Context, object client.Object) []reconcile.Request {
+		return r.findAffectedSecrets(context, object)
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&secretsv1beta1.SealedSecret{}).
 		Owns(&apiCoreV1.Secret{}).
-		Watches(&source.Kind{Type: &secretsv1beta1.KeyEncryptionKeyPolicy{}}, handler.EnqueueRequestsFromMapFunc(mapper), builder.WithPredicates(fromControllerNamespace)).
+		Watches(&secretsv1beta1.KeyEncryptionKeyPolicy{}, handler.EnqueueRequestsFromMapFunc(mapper), builder.WithPredicates(fromControllerNamespace)).
 		Complete(r)
 }
