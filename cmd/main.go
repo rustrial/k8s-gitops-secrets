@@ -20,7 +20,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -40,6 +39,8 @@ import (
 	secretscontroller "github.com/rustrial/k8s-gitops-secrets/internal/controller/secrets"
 	"github.com/rustrial/k8s-gitops-secrets/internal/providers"
 	awsProvider "github.com/rustrial/k8s-gitops-secrets/internal/providers/aws"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -80,11 +81,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	cacheConfig := cache.Options{}
+	if namespace != "" {
+		cacheConfig.DefaultNamespaces[namespace] = cache.Config{}
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		Namespace:              namespace,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Scheme: scheme,
+		Cache:  cacheConfig,
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "e6233917cd37-controller-secrets-rustrial-org",
@@ -156,12 +163,12 @@ func getControllerNamespace() (string, error) {
 		return strings.TrimSpace(ns), nil
 	}
 	// Fall back to the namespace associated with the service account token, if available
-	data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		return "", err
 	}
 	if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
 		return ns, nil
 	}
-	return "", fmt.Errorf("Failed to determine current namespace")
+	return "", fmt.Errorf("failed to determine current namespace")
 }

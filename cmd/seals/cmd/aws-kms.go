@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -37,7 +37,7 @@ var encrypt = &cobra.Command{
 			os.Exit(1)
 		}
 		provider := awsProvider.NewKmsProvider(cfg)
-		plainText, err := ioutil.ReadAll(os.Stdin)
+		plainText, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error while reading plain text data from STDIN: %s\n", err)
 			os.Exit(1)
@@ -52,7 +52,7 @@ var encrypt = &cobra.Command{
 					fmt.Fprintf(os.Stderr, "Error while decrypting plaintext data: %s\n", err)
 					os.Exit(1)
 				}
-				if bytes.Compare(pt, plainText) != 0 {
+				if !bytes.Equal(pt, plainText) {
 					fmt.Fprintf(os.Stderr, "Decrypting plaintext does not match the input plaintext\n")
 					os.Exit(1)
 				}
