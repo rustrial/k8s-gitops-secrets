@@ -33,31 +33,6 @@ rules:
   - secrets.rustrial.org
   resources:
   - keyencryptionkeypolicies
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - secrets.rustrial.org
-  resources:
-  - keyencryptionkeypolicies/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - secrets.rustrial.org
-  resources:
-  - keyencryptionkeypolicies/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - secrets.rustrial.org
-  resources:
   - sealedsecrets
   verbs:
   - create
@@ -70,12 +45,14 @@ rules:
 - apiGroups:
   - secrets.rustrial.org
   resources:
+  - keyencryptionkeypolicies/finalizers
   - sealedsecrets/finalizers
   verbs:
   - update
 - apiGroups:
   - secrets.rustrial.org
   resources:
+  - keyencryptionkeypolicies/status
   - sealedsecrets/status
   verbs:
   - get
