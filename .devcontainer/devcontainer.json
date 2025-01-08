@@ -13,7 +13,9 @@
         "golang.go",
         "ms-vscode.makefile-tools",
         "ms-azuretools.vscode-docker",
-        "mhutchie.git-graph"
+        "mhutchie.git-graph",
+        "fill-labs.dependi",
+        "github.vscode-github-actions"
       ]
     }
   }

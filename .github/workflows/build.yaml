@@ -24,17 +24,17 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.23.x
+          go-version: 1.23.4
       - name: Setup Kubernetes
         uses: helm/kind-action@v1.5.0
         with:
-          version: "v0.22.0" # https://github.com/kubernetes-sigs/kind/releases
-          node_image: "kindest/node:v1.29.2"
+          version: "v0.26.0" # https://github.com/kubernetes-sigs/kind/releases
+          node_image: "kindest/node:v1.32.0"
           cluster_name: kind
       - name: Setup Helm
         uses: fluxcd/pkg/actions/helm@main
         with:
-          version: "v3.14.4"
+          version: "v3.16.4"
       - name: Setup Kustomize
         uses: fluxcd/pkg/actions/kustomize@main
         with:
@@ -46,7 +46,7 @@ jobs:
       - name: Setup Kubectl
         uses: fluxcd/pkg/actions/kubectl@main
         with:
-          version: "1.29.2"
+          version: "1.32.0"
       - name: Run tests
         run: make test
         env:
