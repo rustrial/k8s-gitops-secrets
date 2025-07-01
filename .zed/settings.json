@@ -1,0 +1,10 @@
+{
+  "lsp": {
+      "gopls": {
+        "binary": {
+          "path": "/go/bin/gopls",
+          "args": []
+        }
+      }
+  }
+}

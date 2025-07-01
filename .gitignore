@@ -31,3 +31,5 @@ testbin/*
 .vscode/dryrun.log
 .vscode/settings.json
 .vscode/targets.log
+
+.DS_Store
