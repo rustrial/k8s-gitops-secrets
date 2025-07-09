@@ -22,7 +22,8 @@ dump_status() {
     echo "#========================================================================================"
     echo "# Logs:"
     echo "#========================================================================================"
-    kubectl -n k8s-gitops-secrets-system logs deployment/k8s-gitops-secrets-controller-manager
+    kubectl -n k8s-gitops-secrets-system logs --all-pods=true --all-containers deployment/k8s-gitops-secrets-controller-manager
+    kubectl -n k8s-gitops-secrets-system logs --all-pods=true --all-containers -p deployment/k8s-gitops-secrets-controller-manager
     set -e
     false
 }
