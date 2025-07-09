@@ -186,7 +186,7 @@ func (r *SealedSecretReconciler) decryptSecret(ctx context.Context, sealedSecret
 					provider, err = providers.GetProvider(ctx, &value.Provider)
 					if err == nil {
 						var binary []byte
-						binary, err = provider.Decrypt(ctx, &value)
+						binary, err = provider.Decrypt(ctx, &value, provider.Audience(ctx, sealedSecret, &value))
 						if err == nil {
 							if secret.Data == nil {
 								secret.Data = make(map[string][]byte)
