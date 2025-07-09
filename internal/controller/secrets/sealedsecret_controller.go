@@ -90,7 +90,7 @@ func (r *SealedSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			err = updateStatusErr
 		}
 	}
-	durationMsg := fmt.Sprintf("reconcilation of SealedSecret %s/%s finished in %s (%s)", sealedSecret.Namespace, sealedSecret.Name, time.Now().Sub(start).String(), err)
+	durationMsg := fmt.Sprintf("reconcilation of SealedSecret %s/%s finished in %s (%s)", sealedSecret.Namespace, sealedSecret.Name, time.Since(start).String(), err)
 	if result.RequeueAfter > 0 {
 		durationMsg = fmt.Sprintf("%s, next run in %s", durationMsg, result.RequeueAfter.String())
 	}
@@ -132,13 +132,13 @@ func (r *SealedSecretReconciler) reconcile(ctx context.Context, sealedSecret *se
 				po := &client.PatchOptions{FieldManager: fieldManager}
 				po.ApplyOptions([]client.PatchOption{client.ForceOwnership})
 				err = r.Patch(ctx, secret, client.Apply, po)
-				break
+
 			default:
 				// Make sure we retain (do not remove) any finalizers added to the Secret by other
 				// controllers.
 				secret.ObjectMeta.Finalizers = latest.ObjectMeta.Finalizers
 				err = r.Patch(ctx, secret, client.MergeFrom(latest), &client.PatchOptions{FieldManager: fieldManager})
-				break
+
 			}
 			if err == nil {
 				msg := fmt.Sprintf("Patched %s %s/%s", secret.Kind, secret.Namespace, secret.Name)
@@ -364,7 +364,7 @@ func (r *SealedSecretReconciler) reconcileDelete(ctx context.Context, sealedSecr
 	key := client.ObjectKeyFromObject(sealedSecret)
 	latest := &apiCoreV1.Secret{}
 	var err error = nil
-	if err = r.Client.Get(ctx, key, latest); err == nil && latest != nil && latest.ObjectMeta.DeletionTimestamp.IsZero() {
+	if err = r.Client.Get(ctx, key, latest); err == nil && latest.ObjectMeta.DeletionTimestamp.IsZero() {
 		err = r.Delete(ctx, latest)
 		if err == nil {
 			msg := fmt.Sprintf("Deleted %s %s/%s", latest.Kind, latest.Namespace, latest.Name)
