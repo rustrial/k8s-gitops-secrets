@@ -3,9 +3,11 @@
     "dockerfile": "./Dockerfile"
   },
   "mounts": [
+    "source=${localEnv:HOME}/.kube,target=/root/.kube,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.aws,target=/root/.aws,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind,consistency=cached"
   ],
+  "runArgs": ["--privileged", "--cgroupns=host"],
   "customizations": {
     "vscode": {
       "extensions": [

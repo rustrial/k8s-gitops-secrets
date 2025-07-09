@@ -1,6 +1,6 @@
 module github.com/rustrial/k8s-gitops-secrets
 
-go 1.24.2
+go 1.24.5
 
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.29.17
@@ -15,7 +15,9 @@ require (
 	k8s.io/apimachinery v0.33.2
 	k8s.io/client-go v0.33.2
 	k8s.io/kubectl v0.33.2
-	sigs.k8s.io/controller-runtime v0.21.0
+	// sigs.k8s.io/controller-runtime v0.21.0 caused a memory leak, which resulted in
+	// container beeing OOMKilled, so we stick with v0.20.4 for now.
+	sigs.k8s.io/controller-runtime v0.20.4
 )
 
 require (
@@ -35,7 +37,6 @@ require (
 require (
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.4 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
