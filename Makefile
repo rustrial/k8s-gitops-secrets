@@ -2,7 +2,7 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.32.0
+ENVTEST_K8S_VERSION = 1.33.1
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -23,7 +23,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 .PHONY: all
-all: build api-docs charts 
+all: build api-docs charts
 
 ##@ General
 
@@ -71,7 +71,7 @@ build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/main.go
 	go build -o bin/seals cmd/seals/main.go
 
-cli: 
+cli:
 	GOOS=darwin GOARCH=amd64 go build -o build/darwin/amd64/seals cmd/seals/main.go
 	cat build/darwin/amd64/seals | gzip > build/darwin/amd64/seals.gz
 	GOOS=darwin GOARCH=arm64 go build -o build/darwin/arm64/seals cmd/seals/main.go
@@ -152,8 +152,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.5.0
-CONTROLLER_TOOLS_VERSION ?= v0.16.5
+KUSTOMIZE_VERSION ?= v5.7.0
+CONTROLLER_TOOLS_VERSION ?= v0.18.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.

@@ -52,9 +52,9 @@ jobs:
     strategy:
       matrix:
         k8s: # Must be available from https://github.com/kubernetes-sigs/kind/releases
-          - v1.30.8
-          - v1.31.4
-          - v1.32.0
+          - v1.31.9
+          - v1.32.5
+          - v1.33.1
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -63,13 +63,13 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v1
         with:
-          version: "v3.16.4"
+          version: "v3.18.4"
       - name: Run chart-testing (lint)
         run: (cd charts/k8s-gitops-secrets-controller && helm lint .)
       - name: Create kind ${{ matrix.k8s }} cluster
         uses: helm/kind-action@v1.10.0
         with:
-          version: "v0.26.0" # https://github.com/kubernetes-sigs/kind/releases
+          version: "v0.29.0" # https://github.com/kubernetes-sigs/kind/releases
           node_image: kindest/node:${{ matrix.k8s }}
       - name: Install chart
         run: (cd charts/k8s-gitops-secrets-controller && helm install k8s-gitops-secrets-controller . -n k8s-gitops-secrets-system --create-namespace --wait --set fullnameOverride=k8s-gitops-secrets-controller-manager --set-string image.tag=${{env.VERSION}})
@@ -104,7 +104,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.23.4
+          go-version: 1.24.2
       - name: Build seals CLI
         run: make cli
       - name: Extract TAG_NAME from GITHUB_REF
@@ -193,7 +193,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v1
         with:
-          version: v3.16.4
+          version: v3.18.4
       - name: Install CR
         run: .github/install-cr.sh
       - name: Update Helm Chart versions
