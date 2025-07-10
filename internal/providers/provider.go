@@ -28,7 +28,7 @@ type ProviderFactory interface {
 // DecryptionProvider implements logic to decrypt and envelop encrypted secret value.
 type DecryptionProvider interface {
 	// Extract audience information from the object.
-	Audience(ctx context.Context, sealedSecret *secretsv1beta1.SealedSecret, envelope *secretsv1beta1.Envelope) Audience
+	Audience(ctx context.Context, sealedSecret *secretsv1beta1.SealedSecret, envelope *secretsv1beta1.Envelope) (Audience, []string)
 	// Decrypt envelope encrypted secret value.
 	Decrypt(ctx context.Context, envelope *secretsv1beta1.Envelope, audience Audience) ([]byte, error)
 }

@@ -26,7 +26,21 @@ const (
 	RegionsKey    = "region"
 )
 
-func AwsAudienceFromMap(input map[string]string) *AwsAudience {
+func sanitize(list []string) {
+	for i, item := range list {
+		list[i] = strings.TrimSpace(item)
+	}
+}
+
+func (self *AwsAudience) Sanitize() {
+	sanitize(self.Names)
+	sanitize(self.Namespaces)
+	sanitize(self.Partitions)
+	sanitize(self.Regions)
+	sanitize(self.OrgUnits)
+}
+
+func awsAudienceFromMap(input map[string]string) *AwsAudience {
 	audience := AwsAudience{}
 	for key, value := range input {
 		switch key {

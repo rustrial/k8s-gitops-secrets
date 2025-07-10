@@ -22,37 +22,6 @@ import (
 
 // KmsProviderFactory implementation.
 type KmsProviderFactory struct {
-	config  aws.Config
-	pattern *regexp.Regexp
-}
-
-func pattern() *regexp.Regexp {
-	return regexp.MustCompile(`^arn:[^:]+:kms:([^:]+):[^:]+:(key|alias)/.+$`)
-}
-
-// NewKmsProviderFactory creates new KmsProviderFactory instance.
-func NewKmsProviderFactory(config aws.Config) *KmsProviderFactory {
-	pattern := pattern()
-	return &KmsProviderFactory{
-		config,
-		pattern,
-	}
-}
-
-// NewProvider creates new DecryptionProvider instance.
-func (p *KmsProviderFactory) NewProvider(ctx context.Context, provider *secretsv1beta1.Provider) (providers.DecryptionProvider, error) {
-	if provider.AwsKms != nil && p.pattern.MatchString(provider.KeyEncryptionKeyID) {
-		return NewKmsProvider(p.config.Copy()), nil
-	}
-	return nil, nil
-}
-
-// KmsProvider providing AWS KMS implementation.
-//
-// Versions 1:
-//
-// Uses AES-256 bit symmtectric encryption in GCM mode, which provides AEAD.
-type KmsProvider struct {
 	config       aws.Config
 	pattern      *regexp.Regexp
 	awsRegion    string
@@ -60,24 +29,23 @@ type KmsProvider struct {
 	awsAccountId string
 }
 
-// NewKmsProvider instance.
-func NewKmsProvider(config aws.Config) *KmsProvider {
+func pattern() *regexp.Regexp {
+	return regexp.MustCompile(`^arn:[^:]+:kms:([^:]+):[^:]+:(key|alias)/.+$`)
+}
+
+// NewKmsProviderFactory creates new KmsProviderFactory instance.
+func NewKmsProviderFactory(ctx context.Context, config aws.Config) (*KmsProviderFactory, error) {
 	pattern := pattern()
-	p := KmsProvider{
-		config:       config,
-		pattern:      pattern,
-		awsRegion:    "",
-		awsPartition: "",
-		awsAccountId: "",
-	}
+	p := KmsProviderFactory{}
+	p.config = config
+	p.pattern = pattern
 	// Get current region from config
 	p.awsRegion = config.Region
-	// Lookup current AWS Region, Partition and Account ID
+	// Lookup current AWS Partition and Account ID
 	stsClient := sts.NewFromConfig(config)
-	callerIdentity, err := stsClient.GetCallerIdentity(context.TODO(), &sts.GetCallerIdentityInput{})
+	callerIdentity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
-		// If we can't get caller identity, continue with empty values
-		// This allows the provider to still work in environments where STS is not available
+		return &p, err
 	} else {
 		if callerIdentity.Account != nil {
 			// Extract partition from ARN (format: arn:partition:service:region:account-id:resource)
@@ -92,7 +60,41 @@ func NewKmsProvider(config aws.Config) *KmsProvider {
 			}
 		}
 	}
+	return &p, nil
+}
+
+// NewProvider creates new DecryptionProvider instance.
+func (pf *KmsProviderFactory) NewProvider(ctx context.Context, provider *secretsv1beta1.Provider) (providers.DecryptionProvider, error) {
+	if provider.AwsKms != nil && pf.pattern.MatchString(provider.KeyEncryptionKeyID) {
+		p := pf.NewKmsProvider()
+		return p, nil
+	}
+	return nil, nil
+}
+
+// NewProvider creates new DecryptionProvider instance.
+func (pf *KmsProviderFactory) NewKmsProvider() *KmsProvider {
+	p := KmsProvider{
+		config:       pf.config.Copy(),
+		pattern:      pf.pattern,
+		awsRegion:    pf.awsRegion,
+		awsPartition: pf.awsPartition,
+		awsAccountId: pf.awsAccountId,
+	}
 	return &p
+}
+
+// KmsProvider providing AWS KMS implementation.
+//
+// Versions 1:
+//
+// Uses AES-256 bit symmtectric encryption in GCM mode, which provides AEAD.
+type KmsProvider struct {
+	config       aws.Config
+	pattern      *regexp.Regexp
+	awsRegion    string
+	awsPartition string
+	awsAccountId string
 }
 
 func (p *KmsProvider) adaptConfig(ctx context.Context, arn string) (*aws.Config, error) {
@@ -190,25 +192,31 @@ func (p *KmsProvider) encryptV1(ctx context.Context, svc *kms.Client, plainText 
 	}, nil
 }
 
-func (p *KmsProvider) Audience(ctx context.Context, sealedSecret *secretsv1beta1.SealedSecret, envelope *secretsv1beta1.Envelope) providers.Audience {
+func (p *KmsProvider) Audience(ctx context.Context, sealedSecret *secretsv1beta1.SealedSecret, envelope *secretsv1beta1.Envelope) (providers.Audience, []string) {
 	context := envelope.AwsKms.EncryptionContext
-	audience := AwsAudienceFromMap(context)
+	audience := awsAudienceFromMap(context)
+	failures := make([]string, 0)
 	if len(audience.Namespaces) > 0 && !slices.Contains(audience.Namespaces, sealedSecret.Namespace) {
 		audience.Namespaces = []string{}
+		failures = append(failures, fmt.Sprintf("namespace '%s' is not in audience", sealedSecret.Namespace))
 	}
 	if len(audience.Names) > 0 && !slices.Contains(audience.Names, sealedSecret.Name) {
 		audience.Names = []string{}
+		failures = append(failures, fmt.Sprintf("name '%s' is not in audience", sealedSecret.Name))
 	}
 	if len(audience.Partitions) > 0 && !slices.Contains(audience.Partitions, p.awsPartition) {
 		audience.Partitions = []string{}
+		failures = append(failures, fmt.Sprintf("partition '%s' is not in audience", p.awsPartition))
 	}
 	if len(audience.Regions) > 0 && !slices.Contains(audience.Regions, p.awsRegion) {
 		audience.Regions = []string{}
+		failures = append(failures, fmt.Sprintf("region '%s' is not in audience", p.awsRegion))
 	}
 	if len(audience.OrgUnits) > 0 && !slices.Contains(audience.OrgUnits, p.awsAccountId) {
 		audience.OrgUnits = []string{}
+		failures = append(failures, fmt.Sprintf("account '%s' is not in audience", p.awsAccountId))
 	}
-	return audience
+	return audience, failures
 }
 
 // Decrypt envelope encrypted secret value.

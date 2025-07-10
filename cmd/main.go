@@ -152,7 +152,12 @@ func setupProviders() error {
 		fmt.Fprintf(os.Stderr, "unable to load AWS SDK config, %s", err)
 		os.Exit(1)
 	}
-	providers.RegisterProviderFactory(awsProvider.NewKmsProviderFactory(config))
+	factory, err := awsProvider.NewKmsProviderFactory(ctx, config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to load AWS KMS ProviderFactory: %s", err)
+		os.Exit(1)
+	}
+	providers.RegisterProviderFactory(factory)
 	return nil
 }
 
