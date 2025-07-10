@@ -39,6 +39,10 @@ type AwsKmsProvider struct {
 	// Nonce of stream cipher
 	// +optional
 	Nonce []byte `json:"nonce,omitempty"`
+
+	// KMS Encryption Context
+	// +optional
+	EncryptionContext map[string]string `json:"encryptionContext,omitempty"`
 }
 
 // Provider only one can be defined.

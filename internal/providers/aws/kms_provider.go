@@ -8,10 +8,13 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/rustrial/k8s-gitops-secrets/api/secrets/v1beta1"
 	secretsv1beta1 "github.com/rustrial/k8s-gitops-secrets/api/secrets/v1beta1"
 	"github.com/rustrial/k8s-gitops-secrets/internal/providers"
@@ -19,29 +22,66 @@ import (
 
 // KmsProviderFactory implementation.
 type KmsProviderFactory struct {
-	config  aws.Config
-	pattern *regexp.Regexp
+	config       aws.Config
+	pattern      *regexp.Regexp
+	awsRegion    string
+	awsPartition string
+	awsAccountId string
 }
 
 func pattern() *regexp.Regexp {
-	return regexp.MustCompile(`^arn:aws:kms:([^:]+):[^:]+:(key|alias)/.+$`)
+	return regexp.MustCompile(`^arn:[^:]+:kms:([^:]+):[^:]+:(key|alias)/.+$`)
 }
 
 // NewKmsProviderFactory creates new KmsProviderFactory instance.
-func NewKmsProviderFactory(config aws.Config) *KmsProviderFactory {
+func NewKmsProviderFactory(ctx context.Context, config aws.Config) (*KmsProviderFactory, error) {
 	pattern := pattern()
-	return &KmsProviderFactory{
-		config,
-		pattern,
+	p := KmsProviderFactory{}
+	p.config = config
+	p.pattern = pattern
+	// Get current region from config
+	p.awsRegion = config.Region
+	// Lookup current AWS Partition and Account ID
+	stsClient := sts.NewFromConfig(config)
+	callerIdentity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return &p, err
+	} else {
+		if callerIdentity.Account != nil {
+			// Extract partition from ARN (format: arn:partition:service:region:account-id:resource)
+			if callerIdentity.Arn != nil {
+				arnParts := strings.Split(*callerIdentity.Arn, ":")
+				if len(arnParts) >= 2 {
+					p.awsPartition = arnParts[1]
+				}
+				if len(arnParts) >= 5 {
+					p.awsAccountId = arnParts[4]
+				}
+			}
+		}
 	}
+	return &p, nil
 }
 
 // NewProvider creates new DecryptionProvider instance.
-func (p *KmsProviderFactory) NewProvider(ctx context.Context, provider *secretsv1beta1.Provider) (providers.DecryptionProvider, error) {
-	if provider.AwsKms != nil && p.pattern.MatchString(provider.KeyEncryptionKeyID) {
-		return NewKmsProvider(p.config.Copy()), nil
+func (pf *KmsProviderFactory) NewProvider(ctx context.Context, provider *secretsv1beta1.Provider) (providers.DecryptionProvider, error) {
+	if provider.AwsKms != nil && pf.pattern.MatchString(provider.KeyEncryptionKeyID) {
+		p := pf.NewKmsProvider()
+		return p, nil
 	}
 	return nil, nil
+}
+
+// NewProvider creates new DecryptionProvider instance.
+func (pf *KmsProviderFactory) NewKmsProvider() *KmsProvider {
+	p := KmsProvider{
+		config:       pf.config.Copy(),
+		pattern:      pf.pattern,
+		awsRegion:    pf.awsRegion,
+		awsPartition: pf.awsPartition,
+		awsAccountId: pf.awsAccountId,
+	}
+	return &p
 }
 
 // KmsProvider providing AWS KMS implementation.
@@ -50,17 +90,11 @@ func (p *KmsProviderFactory) NewProvider(ctx context.Context, provider *secretsv
 //
 // Uses AES-256 bit symmtectric encryption in GCM mode, which provides AEAD.
 type KmsProvider struct {
-	config  aws.Config
-	pattern *regexp.Regexp
-}
-
-// NewKmsProvider instance.
-func NewKmsProvider(config aws.Config) *KmsProvider {
-	pattern := pattern()
-	return &KmsProvider{
-		config,
-		pattern,
-	}
+	config       aws.Config
+	pattern      *regexp.Regexp
+	awsRegion    string
+	awsPartition string
+	awsAccountId string
 }
 
 func (p *KmsProvider) adaptConfig(ctx context.Context, arn string) (*aws.Config, error) {
@@ -74,13 +108,13 @@ func (p *KmsProvider) adaptConfig(ctx context.Context, arn string) (*aws.Config,
 }
 
 // Encrypt plaintext into Envelope.
-func (p *KmsProvider) Encrypt(ctx context.Context, plainText []byte, arn string) (*secretsv1beta1.Envelope, error) {
+func (p *KmsProvider) Encrypt(ctx context.Context, plainText []byte, arn string, audience providers.Audience) (*secretsv1beta1.Envelope, error) {
 	cfg, err := p.adaptConfig(ctx, arn)
 	if err != nil {
 		return nil, err
 	}
 	svc := kms.NewFromConfig(*cfg)
-	return p.encryptV1(ctx, svc, plainText, arn)
+	return p.encryptV1(ctx, svc, plainText, arn, audience)
 }
 
 // DO NOT modify this function, otherwise we break the contract for Additional Authenticated Data (AAD)
@@ -97,7 +131,7 @@ func v1Aad(dataKey []byte, kek string, provider *v1beta1.AwsKmsProvider) []byte 
 	return append(append(append(append(version, arn...), dataKey...), alg...), provider.Nonce...)
 }
 
-func (p *KmsProvider) kmsGenerateDataKey(ctx context.Context, svc *kms.Client, arn string) (*kms.GenerateDataKeyOutput, error) {
+func (p *KmsProvider) kmsGenerateDataKey(ctx context.Context, svc *kms.Client, arn string, encryptionContext map[string]string) (*kms.GenerateDataKeyOutput, error) {
 	if arn == "arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000" {
 		// This hack enables testing without depending on real AWS KMS service
 		return &kms.GenerateDataKeyOutput{
@@ -107,15 +141,17 @@ func (p *KmsProvider) kmsGenerateDataKey(ctx context.Context, svc *kms.Client, a
 		}, nil
 	}
 	return svc.GenerateDataKey(context.TODO(), &kms.GenerateDataKeyInput{
-		KeyId:   &arn,
-		KeySpec: types.DataKeySpecAes256,
+		KeyId:             &arn,
+		KeySpec:           types.DataKeySpecAes256,
+		EncryptionContext: encryptionContext,
 	})
 }
 
 // DO NOT modify this function, otherwise we break the contract for Additional Authenticated Data (AAD)
 // of AEAD and decrypt of existing SealedSecrets with provider.Version `1` will no longer work.
-func (p *KmsProvider) encryptV1(ctx context.Context, svc *kms.Client, plainText []byte, arn string) (*secretsv1beta1.Envelope, error) {
-	kp, err := p.kmsGenerateDataKey(ctx, svc, arn)
+func (p *KmsProvider) encryptV1(ctx context.Context, svc *kms.Client, plainText []byte, arn string, audience providers.Audience) (*secretsv1beta1.Envelope, error) {
+	encryptionContext := audience.Audience()
+	kp, err := p.kmsGenerateDataKey(ctx, svc, arn, encryptionContext)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating AWS KMS DataKey: %w", err)
 	}
@@ -140,6 +176,7 @@ func (p *KmsProvider) encryptV1(ctx context.Context, svc *kms.Client, plainText 
 		Version:             1,
 		EncryptionAlgorithm: string(types.DataKeySpecAes256),
 		Nonce:               nonce,
+		EncryptionContext:   encryptionContext,
 	}
 	// We use AEAD with Additional Authenticated Data (AAD) to detect whether the
 	// secret has been manipulated.
@@ -155,8 +192,35 @@ func (p *KmsProvider) encryptV1(ctx context.Context, svc *kms.Client, plainText 
 	}, nil
 }
 
+func (p *KmsProvider) Audience(ctx context.Context, sealedSecret *secretsv1beta1.SealedSecret, envelope *secretsv1beta1.Envelope) (providers.Audience, []string) {
+	context := envelope.AwsKms.EncryptionContext
+	audience := awsAudienceFromMap(context)
+	failures := make([]string, 0)
+	if len(audience.Namespaces) > 0 && !slices.Contains(audience.Namespaces, sealedSecret.Namespace) {
+		audience.Namespaces = []string{}
+		failures = append(failures, fmt.Sprintf("namespace '%s' is not in audience", sealedSecret.Namespace))
+	}
+	if len(audience.Names) > 0 && !slices.Contains(audience.Names, sealedSecret.Name) {
+		audience.Names = []string{}
+		failures = append(failures, fmt.Sprintf("name '%s' is not in audience", sealedSecret.Name))
+	}
+	if len(audience.Partitions) > 0 && !slices.Contains(audience.Partitions, p.awsPartition) {
+		audience.Partitions = []string{}
+		failures = append(failures, fmt.Sprintf("partition '%s' is not in audience", p.awsPartition))
+	}
+	if len(audience.Regions) > 0 && !slices.Contains(audience.Regions, p.awsRegion) {
+		audience.Regions = []string{}
+		failures = append(failures, fmt.Sprintf("region '%s' is not in audience", p.awsRegion))
+	}
+	if len(audience.OrgUnits) > 0 && !slices.Contains(audience.OrgUnits, p.awsAccountId) {
+		audience.OrgUnits = []string{}
+		failures = append(failures, fmt.Sprintf("account '%s' is not in audience", p.awsAccountId))
+	}
+	return audience, failures
+}
+
 // Decrypt envelope encrypted secret value.
-func (p *KmsProvider) Decrypt(ctx context.Context, envelope *secretsv1beta1.Envelope) ([]byte, error) {
+func (p *KmsProvider) Decrypt(ctx context.Context, envelope *secretsv1beta1.Envelope, audience providers.Audience) ([]byte, error) {
 	if envelope.AwsKms == nil {
 		return nil, fmt.Errorf("Envelope has no AWS KMS provider information")
 	}
@@ -167,14 +231,14 @@ func (p *KmsProvider) Decrypt(ctx context.Context, envelope *secretsv1beta1.Enve
 	kms := kms.NewFromConfig(*cfg)
 	switch envelope.AwsKms.Version {
 	case 1:
-		return p.decryptV1(ctx, kms, envelope)
+		return p.decryptV1(ctx, kms, envelope, audience)
 	}
 	return nil, fmt.Errorf("Unsupported encrypted Envelope version %d", envelope.AwsKms.Version)
 }
 
 var testkey []byte = []byte("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 
-func (p *KmsProvider) kmsDecrypt(ctx context.Context, svc *kms.Client, envelope *secretsv1beta1.Envelope) ([]byte, error) {
+func (p *KmsProvider) kmsDecrypt(ctx context.Context, svc *kms.Client, envelope *secretsv1beta1.Envelope, audience providers.Audience) ([]byte, error) {
 	if envelope.KeyEncryptionKeyID == "arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000" {
 		// This hack enables testing without depending on real AWS KMS service
 		return envelope.DataEncryptionKey, nil
@@ -183,6 +247,7 @@ func (p *KmsProvider) kmsDecrypt(ctx context.Context, svc *kms.Client, envelope 
 		CiphertextBlob:      envelope.DataEncryptionKey,
 		EncryptionAlgorithm: types.EncryptionAlgorithmSpecSymmetricDefault,
 		KeyId:               &envelope.KeyEncryptionKeyID,
+		EncryptionContext:   audience.Audience(),
 	})
 	if err != nil {
 		return nil, err
@@ -190,8 +255,8 @@ func (p *KmsProvider) kmsDecrypt(ctx context.Context, svc *kms.Client, envelope 
 	return dataKey.Plaintext, nil
 }
 
-func (p *KmsProvider) decryptV1(ctx context.Context, svc *kms.Client, envelope *secretsv1beta1.Envelope) ([]byte, error) {
-	dataKey, err := p.kmsDecrypt(ctx, svc, envelope)
+func (p *KmsProvider) decryptV1(ctx context.Context, svc *kms.Client, envelope *secretsv1beta1.Envelope, audience providers.Audience) ([]byte, error) {
+	dataKey, err := p.kmsDecrypt(ctx, svc, envelope, audience)
 	if err != nil {
 		return nil, fmt.Errorf("Error while decrypting dataKey using KMS key %s: %w", envelope.KeyEncryptionKeyID, err)
 	}

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -14,8 +13,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var audience = awsProvider.AwsAudience{}
+
 func init() {
 	encrypt.Flags().BoolVarP(&verify, "verify", "v", false, "Verify output by decrypting it, needs Decrypt permission on the KMS CMK.")
+	encrypt.Flags().StringArrayVarP(&audience.Namespaces, "namespace", "", []string{}, "Audience: Kubernetes namespace(s)")
+	encrypt.Flags().StringArrayVarP(&audience.Names, "name", "", []string{}, "Audience: Kubernetes Secret name(s)")
+	encrypt.Flags().StringArrayVarP(&audience.Regions, "region", "", []string{}, "Audience: AWS Region(s)")
+	encrypt.Flags().StringArrayVarP(&audience.OrgUnits, "account", "", []string{}, "Audience: AWS Account ID(s)")
+	encrypt.Flags().StringArrayVarP(&audience.Partitions, "partition", "", []string{}, "Audience: AWS Partition(s)")
 	rootCmd.AddCommand(encrypt)
 }
 
@@ -30,13 +36,21 @@ var encrypt = &cobra.Command{
 	Example:    "cat secret.txt | seals aws-kms arn:aws:kms:eu-central-1:000000000000:key/6a06295d-f3c1-4462-9fba-67f13120963d",
 	Args:       cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx := context.TODO()
+		audience.Sanitize()
+		ctx := cmd.Context()
 		cfg, err := config.LoadDefaultConfig(ctx)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "unable to load AWS SDK config, %s", err)
 			os.Exit(1)
 		}
-		provider := awsProvider.NewKmsProvider(cfg)
+		providerFactory, err := awsProvider.NewKmsProviderFactory(ctx, cfg)
+		// If we can't get caller identity, continue with empty values
+		// This allows the provider to still work in environments where STS is not available
+		if err != nil && providerFactory == nil {
+			fmt.Fprintf(os.Stderr, "unable to load AWS KMS ProviderFactory: %s", err)
+			os.Exit(1)
+		}
+		provider := providerFactory.NewKmsProvider()
 		plainText, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error while reading plain text data from STDIN: %s\n", err)
@@ -45,9 +59,9 @@ var encrypt = &cobra.Command{
 		plainText = bytes.Trim(plainText, "\n\r")
 		output := make(v1beta1.Envelopes, 0)
 		for _, arn := range args {
-			envelope, err := provider.Encrypt(ctx, plainText, arn)
+			envelope, err := provider.Encrypt(ctx, plainText, arn, &audience)
 			if verify {
-				pt, err := provider.Decrypt(ctx, envelope)
+				pt, err := provider.Decrypt(ctx, envelope, &audience)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error while decrypting plaintext data: %s\n", err)
 					os.Exit(1)
