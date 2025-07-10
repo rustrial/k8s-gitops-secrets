@@ -19,7 +19,6 @@ package secrets
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -28,7 +27,6 @@ import (
 	secretsv1beta1 "github.com/rustrial/k8s-gitops-secrets/api/secrets/v1beta1"
 	"github.com/rustrial/k8s-gitops-secrets/internal/providers"
 	apiCoreV1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -109,42 +107,13 @@ func (r *SealedSecretReconciler) reconcile(ctx context.Context, sealedSecret *se
 			// in-memory object. However, let's be defensive here.
 			r.Log.Error(err, fmt.Sprintf("Failed to set controller reference on Secret %s/%s", secret.ObjectMeta.Namespace, secret.ObjectMeta.Name))
 		}
-		key := client.ObjectKeyFromObject(secret)
-		latest := &apiCoreV1.Secret{}
-		if err = r.Client.Get(ctx, key, latest); err != nil {
-			if errors.IsNotFound(err) {
-				err = r.Create(ctx, secret, &client.CreateOptions{FieldManager: fieldManager})
-				if err == nil {
-					msg := fmt.Sprintf("Created %s %s/%s", secret.Kind, secret.Namespace, secret.Name)
-					r.Log.Info(msg)
-					r.Recorder.Event(secret, "Normal", "Created", msg)
-				}
-			}
-		} else {
-			// Long-term we want to move-on to server side apply, but we have to introduce
-			// it softly making sure we are not breaking any existing installations. Thus
-			// we start with an opt-in phase during which JSON MergePatch will stay the default
-			// and if there are no problems we might in a later release switch to an opt-out
-			// approach where server side apply will become the default.
-			patchStrategy := os.Getenv("PATCH_STRATEGY")
-			switch patchStrategy {
-			case "ServerSideApply":
-				po := &client.PatchOptions{FieldManager: fieldManager}
-				po.ApplyOptions([]client.PatchOption{client.ForceOwnership})
-				err = r.Patch(ctx, secret, client.Apply, po)
-
-			default:
-				// Make sure we retain (do not remove) any finalizers added to the Secret by other
-				// controllers.
-				secret.ObjectMeta.Finalizers = latest.ObjectMeta.Finalizers
-				err = r.Patch(ctx, secret, client.MergeFrom(latest), &client.PatchOptions{FieldManager: fieldManager})
-
-			}
-			if err == nil {
-				msg := fmt.Sprintf("Patched %s %s/%s", secret.Kind, secret.Namespace, secret.Name)
-				r.Log.Info(msg)
-				r.Recorder.Event(secret, "Normal", "Updated", msg)
-			}
+		patchOptions := &client.PatchOptions{FieldManager: fieldManager}
+		patchOptions.ApplyOptions([]client.PatchOption{client.ForceOwnership})
+		err = r.Patch(ctx, secret, client.Apply, patchOptions)
+		if err == nil {
+			msg := fmt.Sprintf("Patched %s %s/%s", secret.Kind, secret.Namespace, secret.Name)
+			r.Log.Info(msg)
+			r.Recorder.Event(secret, "Normal", "Updated", msg)
 		}
 	}
 	requeueAfter := time.Second * 0
