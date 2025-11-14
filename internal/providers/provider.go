@@ -16,6 +16,9 @@ func RegisterProviderFactory(factory ProviderFactory) {
 }
 
 type Audience interface {
+	// Return the audience as map, which can then be used
+	// as encryption context for providers that support
+	// Additional Authenticated Data (AAD).
 	Audience() map[string]string
 }
 

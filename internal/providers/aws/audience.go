@@ -19,11 +19,11 @@ type AwsAudience struct {
 }
 
 const (
-	NamespacesKey = "namespace"
-	NamesKey      = "name"
-	PartitionsKey = "partition"
-	OrgUnitsKey   = "orgUnits"
-	RegionsKey    = "region"
+	NamespacesKey = "namespaces"
+	NamesKey      = "names"
+	PartitionsKey = "AwsPartitions"
+	OrgUnitsKey   = "AwsOrgUnits"
+	RegionsKey    = "AwsRegions"
 )
 
 func sanitize(list []string) {
