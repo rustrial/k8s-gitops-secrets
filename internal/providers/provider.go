@@ -15,6 +15,13 @@ func RegisterProviderFactory(factory ProviderFactory) {
 	providerFactories = append(providerFactories, factory)
 }
 
+type Audience interface {
+	// Return the audience as map, which can then be used
+	// as encryption context for providers that support
+	// Additional Authenticated Data (AAD).
+	Audience() map[string]string
+}
+
 // ProviderFactory implements logic to decrypt and envelop encrypted secret value.
 type ProviderFactory interface {
 	// Return DecryptionProvider or nil if it does not support the provided Provider spec.
@@ -23,8 +30,10 @@ type ProviderFactory interface {
 
 // DecryptionProvider implements logic to decrypt and envelop encrypted secret value.
 type DecryptionProvider interface {
+	// Extract audience information from the object.
+	Audience(ctx context.Context, sealedSecret *secretsv1beta1.SealedSecret, envelope *secretsv1beta1.Envelope) (Audience, []string)
 	// Decrypt envelope encrypted secret value.
-	Decrypt(ctx context.Context, envelope *secretsv1beta1.Envelope) ([]byte, error)
+	Decrypt(ctx context.Context, envelope *secretsv1beta1.Envelope, audience Audience) ([]byte, error)
 }
 
 // GetProvider returns provider

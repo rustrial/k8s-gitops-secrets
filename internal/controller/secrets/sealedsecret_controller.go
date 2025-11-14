@@ -167,7 +167,9 @@ func (r *SealedSecretReconciler) decryptSecret(ctx context.Context, sealedSecret
 	// to fix their SealedSecret objects in one go, as they see all the errors at once.
 	var errors error
 	unauthorizedKeks := make([]string, 0)
+	audienceMismatches := make(map[string][]string, 0)
 	for key, envelopes := range sealedSecret.Spec.EncryptedData {
+		unauthorizedKeksForKey := make([]string, 0)
 		for _, value := range envelopes {
 			var err error
 			keks, err := r.findKEK(ctx, value.KeyEncryptionKeyID, kekCache)
@@ -186,7 +188,8 @@ func (r *SealedSecretReconciler) decryptSecret(ctx context.Context, sealedSecret
 					provider, err = providers.GetProvider(ctx, &value.Provider)
 					if err == nil {
 						var binary []byte
-						binary, err = provider.Decrypt(ctx, &value)
+						audience, audienceMismatch := provider.Audience(ctx, sealedSecret, &value)
+						binary, err = provider.Decrypt(ctx, &value, audience)
 						if err == nil {
 							if secret.Data == nil {
 								secret.Data = make(map[string][]byte)
@@ -197,12 +200,17 @@ func (r *SealedSecretReconciler) decryptSecret(ctx context.Context, sealedSecret
 								// StringData entry with same key.
 								delete(secret.StringData, key)
 							}
+							// If one KEK works, we can ignore earlier KEK and audience failures for the same key.
+							unauthorizedKeksForKey = make([]string, 0)
+							delete(audienceMismatches, key)
 							break
+						} else if len(audienceMismatch) > 0 {
+							audienceMismatches[key] = audienceMismatch
 						}
 					}
 				} else {
-					if !slice.ContainsString(unauthorizedKeks, value.KeyEncryptionKeyID, nil) {
-						unauthorizedKeks = append(unauthorizedKeks, value.KeyEncryptionKeyID)
+					if !slice.ContainsString(unauthorizedKeksForKey, value.KeyEncryptionKeyID, nil) {
+						unauthorizedKeksForKey = append(unauthorizedKeksForKey, value.KeyEncryptionKeyID)
 					}
 				}
 			}
@@ -211,6 +219,30 @@ func (r *SealedSecretReconciler) decryptSecret(ctx context.Context, sealedSecret
 				errors = multierror.Append(errors, fmt.Errorf("Failed to decrypt spec.encryptedData.%s: %w", key, err))
 			}
 		}
+		for _, kek := range unauthorizedKeksForKey {
+			if !slice.ContainsString(unauthorizedKeks, kek, nil) {
+				unauthorizedKeks = append(unauthorizedKeks, kek)
+			}
+		}
+	}
+	if len(audienceMismatches) == 0 {
+		updateCondition(sealedSecret, v1.Condition{
+			Type:    "Audience",
+			Status:  v1.ConditionTrue,
+			Reason:  "Authorized",
+			Message: "All audience constraints are satisfied",
+		})
+	} else {
+		reasons := make([]string, 0)
+		for key, reason := range audienceMismatches {
+			reasons = append(reasons, fmt.Sprintf("For '.data.%s' %s", key, strings.Join(reason, ", ")))
+		}
+		updateCondition(sealedSecret, v1.Condition{
+			Type:    "Audience",
+			Status:  v1.ConditionFalse,
+			Reason:  "NotAuthorized",
+			Message: fmt.Sprintf("The following audience constraints are not satisfied: %s", strings.Join(reasons, ". ")),
+		})
 	}
 	if len(unauthorizedKeks) == 0 {
 		status := v1.ConditionTrue

@@ -76,7 +76,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	if err := setupProviders(); err != nil {
+	if err := setupProviders(os.Getenv("CI_TEST") == "true"); err != nil {
 		setupLog.Error(err, "unable to register providers")
 		os.Exit(1)
 	}
@@ -145,14 +145,21 @@ func main() {
 	}
 }
 
-func setupProviders() error {
+func setupProviders(ignoreErrors bool) error {
 	ctx := context.TODO()
 	config, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to load AWS SDK config, %s", err)
-		os.Exit(1)
+		setupLog.Error(err, "unable to load AWS SDK config")
+		return err
 	}
-	providers.RegisterProviderFactory(awsProvider.NewKmsProviderFactory(config))
+	factory, err := awsProvider.NewKmsProviderFactory(ctx, config)
+	if err != nil {
+		setupLog.Error(err, "unable to load AWS KMS ProviderFactory")
+		if !ignoreErrors {
+			return err
+		}
+	}
+	providers.RegisterProviderFactory(factory)
 	return nil
 }
 

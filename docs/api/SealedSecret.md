@@ -117,6 +117,18 @@ string
 <p>Nonce of stream cipher</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>encryptionContext</code><br>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>KMS Encryption Context</p>
+</td>
+</tr>
 </tbody>
 </table>
 </div>
