@@ -1,89 +1,89 @@
 name: build
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - "*"
-  workflow_dispatch:
+    pull_request:
+    push:
+        branches:
+            - main
+            - "*"
+    workflow_dispatch:
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Restore Go cache
-        uses: actions/cache@v3
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.24.5
-      - name: Setup Kubernetes
-        uses: helm/kind-action@v1.5.0
-        with:
-          version: "v0.29.0" # https://github.com/kubernetes-sigs/kind/releases
-          node_image: "kindest/node:v1.33.1"
-          cluster_name: kind
-      - name: Setup Helm
-        uses: fluxcd/pkg/actions/helm@main
-        with:
-          version: "v3.18.4"
-      - name: Setup Kustomize
-        uses: fluxcd/pkg/actions/kustomize@main
-        with:
-          version: "5.7.0"
-      - name: Setup Kubebuilder
-        uses: RyanSiu1995/kubebuilder-action@v1.2
-        with:
-          version: "3.14.2"
-      - name: Setup Kubectl
-        uses: fluxcd/pkg/actions/kubectl@main
-        with:
-          version: "1.33.1"
-      - name: Run tests
-        run: make test
-        env:
-          KUBEBUILDER_ASSETS: /usr/local/kubebuilder/bin
-      - name: Check if working tree is dirty
-        run: |
-          if [[ $(git diff --stat) != '' ]]; then
-            git --no-pager diff
-            echo 'run make test and commit changes'
-            exit 1
-          fi
-      - name: Install from local image
-        run: ./.github/install.sh helm
-        env:
-          KUBEBUILDER_ASSETS: /usr/local/kubebuilder/bin
-      - name: Run e2e tests
-        run: ./.github/e2e-tests.sh
-        env:
-          KUBEBUILDER_ASSETS: /usr/local/kubebuilder/bin
-      - name: Logs
-        continue-on-error: true
-        run: |
-          kubectl -n k8s-gitops-secrets-system logs deploy/k8s-gitops-secrets-controller-manager
-      - name: Debug failure
-        continue-on-error: true
-        if: failure()
-        run: |
-          which kubectl
-          kubectl version
-          echo "-----------------------------------------------"
-          kubectl -n k8s-gitops-secrets-system get all || true
-          echo "-----------------------------------------------"
-          kubectl -n k8s-gitops-secrets-system get sealedsecrets/aws-kms-secret -o yaml || true
-          echo "-----------------------------------------------"
-          kubectl -n k8s-gitops-secrets-system get pods -o yaml || true
-          echo "-----------------------------------------------"
-          kubectl -n k8s-gitops-secrets-system logs deploy/k8s-gitops-secrets-controller-manager
-          echo "-----------------------------------------------"
-      - name: Build seals CLI for all platforms
-        run: make cli
+    build-and-test:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v3
+            - name: Restore Go cache
+              uses: actions/cache@v3
+              with:
+                  path: ~/go/pkg/mod
+                  key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+                  restore-keys: |
+                      ${{ runner.os }}-go-
+            - name: Setup Go
+              uses: actions/setup-go@v3
+              with:
+                  go-version: 1.25.4
+            - name: Setup Kubernetes
+              uses: helm/kind-action@v1.5.0
+              with:
+                  version: "v0.30.0" # https://github.com/kubernetes-sigs/kind/releases
+                  node_image: "kindest/node:v1.34.0"
+                  cluster_name: kind
+            - name: Setup Helm
+              uses: fluxcd/pkg/actions/helm@main
+              with:
+                  version: "v3.19.2"
+            - name: Setup Kustomize
+              uses: fluxcd/pkg/actions/kustomize@main
+              with:
+                  version: "5.8.0" # https://github.com/kubernetes-sigs/kustomize/releases
+            - name: Setup Kubebuilder
+              uses: RyanSiu1995/kubebuilder-action@v1.2
+              with:
+                  version: "4.9.0" # https://github.com/kubernetes-sigs/kubebuilder/releases
+            - name: Setup Kubectl
+              uses: fluxcd/pkg/actions/kubectl@main
+              with:
+                  version: "1.34.2"
+            - name: Run tests
+              run: make test
+              env:
+                  KUBEBUILDER_ASSETS: /usr/local/kubebuilder/bin
+            - name: Check if working tree is dirty
+              run: |
+                  if [[ $(git diff --stat) != '' ]]; then
+                    git --no-pager diff
+                    echo 'run make test and commit changes'
+                    exit 1
+                  fi
+            - name: Install from local image
+              run: ./.github/install.sh helm
+              env:
+                  KUBEBUILDER_ASSETS: /usr/local/kubebuilder/bin
+            - name: Run e2e tests
+              run: ./.github/e2e-tests.sh
+              env:
+                  KUBEBUILDER_ASSETS: /usr/local/kubebuilder/bin
+            - name: Logs
+              continue-on-error: true
+              run: |
+                  kubectl -n k8s-gitops-secrets-system logs deploy/k8s-gitops-secrets-controller-manager
+            - name: Debug failure
+              continue-on-error: true
+              if: failure()
+              run: |
+                  which kubectl
+                  kubectl version
+                  echo "-----------------------------------------------"
+                  kubectl -n k8s-gitops-secrets-system get all || true
+                  echo "-----------------------------------------------"
+                  kubectl -n k8s-gitops-secrets-system get sealedsecrets/aws-kms-secret -o yaml || true
+                  echo "-----------------------------------------------"
+                  kubectl -n k8s-gitops-secrets-system get pods -o yaml || true
+                  echo "-----------------------------------------------"
+                  kubectl -n k8s-gitops-secrets-system logs deploy/k8s-gitops-secrets-controller-manager
+                  echo "-----------------------------------------------"
+            - name: Build seals CLI for all platforms
+              run: make cli

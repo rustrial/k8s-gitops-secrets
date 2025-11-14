@@ -1,4 +1,4 @@
-FROM nexxiot-registry-oci.jfrog.io/golang:1.24.5-alpine3.22
+FROM nexxiot-registry-oci.jfrog.io/golang:1.25.4-alpine3.22
 
 RUN apk --no-cache add git bash make zip kubectl docker fuse-overlayfs helm curl npm # kind
 
@@ -9,4 +9,4 @@ RUN ([ $(uname -m) = aarch64 ] && curl -Lo /usr/bin/kind https://kind.sigs.k8s.i
 
 RUN chmod +x /usr/bin/kind
 
-RUN go install golang.org/x/tools/gopls@v0.19.1
+RUN go install golang.org/x/tools/gopls@v0.20.0
