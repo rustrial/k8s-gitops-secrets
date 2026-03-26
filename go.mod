@@ -1,6 +1,6 @@
 module github.com/rustrial/k8s-gitops-secrets
 
-go 1.25.4
+go 1.26.1
 
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.29.17
