@@ -193,9 +193,11 @@ func (p *KmsProvider) encryptV1(ctx context.Context, svc *kms.Client, plainText 
 }
 
 func (p *KmsProvider) Audience(ctx context.Context, sealedSecret *secretsv1beta1.SealedSecret, envelope *secretsv1beta1.Envelope) (providers.Audience, []string) {
-	context := envelope.AwsKms.EncryptionContext
-	audience := awsAudienceFromMap(context)
 	failures := make([]string, 0)
+	if envelope.AwsKms == nil {
+		return &AwsAudience{}, failures
+	}
+	audience := awsAudienceFromMap(envelope.AwsKms.EncryptionContext)
 	if len(audience.Namespaces) > 0 && !slices.Contains(audience.Namespaces, sealedSecret.Namespace) {
 		audience.Namespaces = []string{}
 		failures = append(failures, fmt.Sprintf("namespace '%s' is not in audience", sealedSecret.Namespace))

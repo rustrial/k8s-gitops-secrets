@@ -63,6 +63,37 @@ spec:
     - "*"
 ```
 
+## Audience Narrowing
+
+Audience narrowing allows you to restrict **where** a `SealedSecret` can be decrypted by
+binding the encrypted data to a specific context (e.g. namespace, secret name, AWS region,
+AWS account, or AWS partition). The audience constraints are cryptographically enforced via
+the encryption provider's context mechanism (e.g.
+[AWS KMS Encryption Context](https://docs.aws.amazon.com/kms/latest/developerguide/encrypt_context.html)),
+so they cannot be bypassed without access to the _KEK_.
+
+> **⚠️ Security Warning — multi-tenant clusters:**
+> Using audience narrowing is **highly recommended**, especially in multi-tenant setups.
+> Without it, an attacker who has read-only access to a `SealedSecret` (e.g. via a Git
+> repository) could simply copy it into their own namespace and have the controller decrypt
+> it there. By specifying `--namespace` and/or `--name` at encryption time you ensure that
+> the secret can **only** be decrypted into the intended namespace and secret name.
+
+The following audience constraints are available when encrypting with the `seals` CLI:
+
+| CLI flag | Constraint |
+|---|---|
+| `--namespace` | Kubernetes namespace(s) in which the `SealedSecret` can be decrypted |
+| `--name` | Kubernetes Secret name(s) into which the `SealedSecret` can be decrypted |
+| `--region` | AWS Region(s) in which the `SealedSecret` can be decrypted |
+| `--account` | AWS Account ID(s) in which the `SealedSecret` can be decrypted |
+| `--partition` | AWS Partition(s) in which the `SealedSecret` can be decrypted |
+
+Each flag can be specified multiple times to allow multiple values. The controller will
+verify at decryption time that the `SealedSecret`'s actual context (namespace, name,
+controller's AWS region/account/partition) matches at least one of the allowed values for
+every constraint that was set. If any constraint is not satisfied, decryption is refused.
+
 # Usage
 
 ## Controller
@@ -94,12 +125,25 @@ array on `STDOUT`.
 cat my-secret.txt | seals aws-kms arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000
 ```
 
+To narrow the audience so the secret can only be decrypted in namespace `default` with
+secret name `sealedsecret-sample` (recommended — see [Audience Narrowing](#audience-narrowing)):
+
+```shell
+cat my-secret.txt | seals aws-kms \
+  --namespace default \
+  --name sealedsecret-sample \
+  arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000
+```
+
 **Example output**
 
 ```yaml
 - keyEncryptionKeyId: arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000
   awsKms:
     encryptionAlgorithm: AES_256
+    encryptionContext:
+      names: sealedsecret-sample
+      namespaces: default
     nonce: 1Mjlj3HkLXjH2x/N
     version: 1
   cipherText: O595N8v+MrHeL6G8jOaS1/yh
@@ -138,6 +182,9 @@ spec:
       - keyEncryptionKeyId: arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000
         awsKms:
           encryptionAlgorithm: AES_256
+          encryptionContext:
+            names: sealedsecret-sample
+            namespaces: default
           nonce: 1Mjlj3HkLXjH2x/N
           version: 1
         cipherText: O595N8v+MrHeL6G8jOaS1/yh
