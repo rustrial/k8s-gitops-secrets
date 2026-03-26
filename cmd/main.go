@@ -83,7 +83,7 @@ func main() {
 
 	cacheConfig := cache.Options{}
 	if namespace != "" {
-		cacheConfig.DefaultNamespaces[namespace] = cache.Config{}
+		cacheConfig.DefaultNamespaces = map[string]cache.Config{namespace: {}}
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -158,8 +158,9 @@ func setupProviders(ignoreErrors bool) error {
 		if !ignoreErrors {
 			return err
 		}
+	} else {
+		providers.RegisterProviderFactory(factory)
 	}
-	providers.RegisterProviderFactory(factory)
 	return nil
 }
 

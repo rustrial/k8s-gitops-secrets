@@ -15,8 +15,6 @@ require (
 	k8s.io/apimachinery v0.35.3
 	k8s.io/client-go v0.35.3
 	k8s.io/kubectl v0.35.3
-	// sigs.k8s.io/controller-runtime v0.21.0 caused a memory leak, which resulted in
-	// container beeing OOMKilled, so we stick with v0.20.4 for now.
 	sigs.k8s.io/controller-runtime v0.23.3
 )
 

@@ -13,3 +13,9 @@ RUN chmod +x /usr/bin/kind
 
 # https://github.com/golang/tools/releases
 RUN go install golang.org/x/tools/gopls@v0.21.1
+
+RUN apk add --no-cache kubectl-krew --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing
+
+ENV PATH="/root/.krew/bin:$PATH"
+
+RUN kubectl krew install oidc-login

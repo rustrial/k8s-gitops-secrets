@@ -60,6 +60,10 @@ var encrypt = &cobra.Command{
 		output := make(v1beta1.Envelopes, 0)
 		for _, arn := range args {
 			envelope, err := provider.Encrypt(ctx, plainText, arn, &audience)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error while encrypting plain text data: %s\n", err)
+				os.Exit(1)
+			}
 			if verify {
 				pt, err := provider.Decrypt(ctx, envelope, &audience)
 				if err != nil {
@@ -70,10 +74,6 @@ var encrypt = &cobra.Command{
 					fmt.Fprintf(os.Stderr, "Decrypting plaintext does not match the input plaintext\n")
 					os.Exit(1)
 				}
-			}
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error while encrypting plain text data: %s\n", err)
-				os.Exit(1)
 			}
 			output = append(output, *envelope)
 		}

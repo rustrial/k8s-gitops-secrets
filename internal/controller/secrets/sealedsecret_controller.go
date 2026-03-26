@@ -19,6 +19,7 @@ package secrets
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -140,18 +141,18 @@ func (r *SealedSecretReconciler) decryptSecret(ctx context.Context, sealedSecret
 			// be addes, we do not allow chosing a different namespace.
 			// This is for security reasons.
 			Namespace:   sealedSecret.ObjectMeta.Namespace,
-			Labels:      sealedSecret.Spec.Metadata.Labels,
-			Annotations: sealedSecret.Spec.Metadata.Annotations,
+			Labels:      maps.Clone(sealedSecret.Spec.Metadata.Labels),
+			Annotations: maps.Clone(sealedSecret.Spec.Metadata.Annotations),
 			// Note, OwnershipReference and Finalizer metadata is set in sealedsecret_controller.go (if at all).
 		},
 		Immutable:  sealedSecret.Spec.Immutable,
 		Type:       sealedSecret.Spec.Type,
-		Data:       sealedSecret.Spec.Data,
-		StringData: sealedSecret.Spec.StringData,
+		Data:       maps.Clone(sealedSecret.Spec.Data),
+		StringData: maps.Clone(sealedSecret.Spec.StringData),
 	}
 	if secret.Labels == nil {
 		// If no labes are explicitly defined, inherit labels from SealedSecret.
-		secret.Labels = sealedSecret.Labels
+		secret.Labels = maps.Clone(sealedSecret.Labels)
 	}
 	if secret.Annotations == nil {
 		// We do not inherit any annotation from the SealedSecret as they might
@@ -312,20 +313,12 @@ func (r *SealedSecretReconciler) findKEK(ctx context.Context, keyEncryptionKeyID
 		return keks, nil
 	}
 	var list secretsv1beta1.KeyEncryptionKeyPolicyList
-	result := make([]secretsv1beta1.KeyEncryptionKeyPolicy, 0)
-	var options []client.ListOption = make([]client.ListOption, 0)
-	options = append(options, client.InNamespace(r.ControllerNamespace), client.MatchingFields{keyEncryptionKeyIDField: keyEncryptionKeyID})
-	var err error = nil
-	for err = r.Client.List(ctx, &list, options...); err == nil; {
-		result = append(result, list.Items...)
-		if list.Continue == "" {
-			break
-		}
-		options = make([]client.ListOption, 0)
-		options = append(options, client.InNamespace(r.ControllerNamespace), client.MatchingFields{keyEncryptionKeyIDField: keyEncryptionKeyID}, client.Continue(list.Continue))
+	err := r.Client.List(ctx, &list, client.InNamespace(r.ControllerNamespace), client.MatchingFields{keyEncryptionKeyIDField: keyEncryptionKeyID})
+	if err != nil {
+		return nil, err
 	}
-	cache[keyEncryptionKeyID] = result
-	return result, err
+	cache[keyEncryptionKeyID] = list.Items
+	return list.Items, nil
 }
 
 func updateCondition(secret *secretsv1beta1.SealedSecret, condition v1.Condition) {
@@ -362,7 +355,11 @@ func (r *SealedSecretReconciler) patchStatus(ctx context.Context, sealedSecret *
 }
 
 func (r *SealedSecretReconciler) reconcileDelete(ctx context.Context, sealedSecret *secretsv1beta1.SealedSecret) (ctrl.Result, error) {
-	key := client.ObjectKeyFromObject(sealedSecret)
+	name := sealedSecret.Spec.Metadata.Name
+	if name == "" {
+		name = sealedSecret.ObjectMeta.Name
+	}
+	key := types.NamespacedName{Namespace: sealedSecret.Namespace, Name: name}
 	latest := &apiCoreV1.Secret{}
 	var err error = nil
 	if err = r.Client.Get(ctx, key, latest); err == nil && latest.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -377,57 +374,61 @@ func (r *SealedSecretReconciler) reconcileDelete(ctx context.Context, sealedSecr
 }
 
 // Select all SealedSecrets for reconciliation which contain a reference to
-// the modified KEK.
-//
-// Unfortunately, I have not yet figured out whether we can index fields in arrays
-// using `mgr.GetFieldIndexer().IndexField(...)`, therefore we have to rely on this
-// brute force lookup.
+// the modified KEK, using a field index on the SealedSecret's envelope KEK IDs.
 func (r *SealedSecretReconciler) findAffectedSecrets(ctx context.Context, object client.Object) []reconcile.Request {
 	var kek secretsv1beta1.KeyEncryptionKeyPolicy
 	key := client.ObjectKeyFromObject(object)
 	sealedSecrets := make([]reconcile.Request, 0)
 	if err := r.Client.Get(ctx, key, &kek); err == nil {
 		var list secretsv1beta1.SealedSecretList
-		var options []client.ListOption = make([]client.ListOption, 0)
-		options = append(options, client.Limit(50))
-		for err := r.Client.List(context.TODO(), &list, options...); err == nil; {
+		if err := r.Client.List(ctx, &list, client.MatchingFields{sealedSecretKeyEncryptionKeyIDField: kek.Spec.KeyEncryptionKeyID}); err == nil {
 			for _, secret := range list.Items {
-				for _, envelopes := range secret.Spec.EncryptedData {
-					for _, envelope := range envelopes {
-						if envelope.KeyEncryptionKeyID == kek.Spec.KeyEncryptionKeyID {
-							sealedSecrets = append(sealedSecrets, reconcile.Request{
-								NamespacedName: types.NamespacedName{
-									Name:      secret.Name,
-									Namespace: secret.Namespace,
-								},
-							})
-						}
-					}
-				}
+				sealedSecrets = append(sealedSecrets, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      secret.Name,
+						Namespace: secret.Namespace,
+					},
+				})
 			}
-			if list.Continue == "" {
-				break
-			}
-			options = make([]client.ListOption, 0)
-			options = append(options, client.Limit(50), client.Continue(list.Continue))
 		}
 	}
 	return sealedSecrets
 }
 
 const (
-	keyEncryptionKeyIDField = ".spec.keyEncryptionKeyId"
+	keyEncryptionKeyIDField             = ".spec.keyEncryptionKeyId"
+	sealedSecretKeyEncryptionKeyIDField = ".spec.encryptedData.keyEncryptionKeyId"
 )
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SealedSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Create index on keyEncryptionKeyId field, which will be used in the findKEK function.
+	// Create index on keyEncryptionKeyId field of KeyEncryptionKeyPolicy, used in findKEK.
 	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &secretsv1beta1.KeyEncryptionKeyPolicy{}, keyEncryptionKeyIDField, func(rawObj client.Object) []string {
 		kek := rawObj.(*secretsv1beta1.KeyEncryptionKeyPolicy)
 		if kek == nil || kek.Namespace != r.ControllerNamespace {
 			return nil
 		}
 		return []string{kek.Spec.KeyEncryptionKeyID}
+	}); err != nil {
+		return err
+	}
+	// Create index on envelope keyEncryptionKeyId fields of SealedSecret, used in findAffectedSecrets.
+	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &secretsv1beta1.SealedSecret{}, sealedSecretKeyEncryptionKeyIDField, func(rawObj client.Object) []string {
+		ss := rawObj.(*secretsv1beta1.SealedSecret)
+		if ss == nil {
+			return nil
+		}
+		ids := make([]string, 0)
+		seen := make(map[string]struct{})
+		for _, envelopes := range ss.Spec.EncryptedData {
+			for _, envelope := range envelopes {
+				if _, ok := seen[envelope.KeyEncryptionKeyID]; !ok {
+					seen[envelope.KeyEncryptionKeyID] = struct{}{}
+					ids = append(ids, envelope.KeyEncryptionKeyID)
+				}
+			}
+		}
+		return ids
 	}); err != nil {
 		return err
 	}
