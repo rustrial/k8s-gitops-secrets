@@ -197,7 +197,7 @@ func (r *SealedSecretReconciler) decryptSecret(ctx context.Context, sealedSecret
 							}
 							secret.Data[key] = binary
 							if secret.StringData != nil {
-								// encrypted secrets have highest prevendence, so make sure we delete any
+								// encrypted secrets have highest precedence, so make sure we delete any
 								// StringData entry with same key.
 								delete(secret.StringData, key)
 							}

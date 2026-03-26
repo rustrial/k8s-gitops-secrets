@@ -27,7 +27,7 @@ a pull request._
 objects define which namespaces are authorized to use a specific _Key Encryption Key_
 (_KEK_) to decrypt `SealedSecret` objects into plaintext Kubernetes `Secret` objects.
 If a `SealedSecret` references any \_KEK\_, for which its namespace is not authorized,
-then the contoller will reject it and not decrypt that `SealedSecret`.
+then the controller will reject it and not decrypt that `SealedSecret`.
 
 For example the following `KeyEncryptionKeyPolicy` authorizes the namespaces
 `kube-system` and `sre-services` to use the _KEK_ with ID
@@ -118,7 +118,7 @@ the AWS KMS provider. Please consult the provider specific documentation
 (see above) for instructions for your encryption provider._
 
 Use the `aws-kms` subcommand of the `seals` command line tool to encrypt data. It expects one or several
-AWD KMS _CMK_ ARNs and will read the secret data from `STDIN` and output the encrypted Envelopes as YAML
+AWS KMS _CMK_ ARNs and will read the secret data from `STDIN` and output the encrypted Envelopes as YAML
 array on `STDOUT`.
 
 ```shell
@@ -154,7 +154,7 @@ cat my-secret.txt | seals aws-kms \
     2FkO9U/xMLak0/XMl++qg==
 ```
 
-The encrypted output can then be integrated into a `SealedSecret` object, which usally
+The encrypted output can then be integrated into a `SealedSecret` object, which usually
 will be stored in Git and later deployed to Kubernetes clusters.
 
 ```yaml
@@ -178,7 +178,7 @@ spec:
   encryptedData:
     my-secret:
       # Note, this is an array to enable encrypting the same entry with
-      # multple KEKs (providers).
+      # multiple KEKs (providers).
       - keyEncryptionKeyId: arn:aws:kms:eu-central-1:000000000000:key/00000000-0000-0000-0000-000000000000
         awsKms:
           encryptionAlgorithm: AES_256

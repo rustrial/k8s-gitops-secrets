@@ -158,7 +158,12 @@ func setupProviders(ignoreErrors bool) error {
 		if !ignoreErrors {
 			return err
 		}
-	} else {
+	}
+	// Register the factory even if NewKmsProviderFactory returned an error (e.g. STS
+	// GetCallerIdentity fails in CI without AWS credentials). The factory is still
+	// partially constructed with config, pattern and region — enough to match envelopes
+	// and decrypt using the built-in test key.
+	if factory != nil {
 		providers.RegisterProviderFactory(factory)
 	}
 	return nil

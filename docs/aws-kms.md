@@ -23,7 +23,7 @@ security as long as only authorized clients are entitled to use them for decrypt
 **Encrypt secret data**:
 
 Use the `aws-kms` subcommand of the `seals` command line tool to encrypt data. It expects one of several
-AWD KMS _CMK_ ARNs and will read the secret data from `STDIN` and output the encrypted Envelops as YAML
+AWS KMS _CMK_ ARNs and will read the secret data from `STDIN` and output the encrypted Envelopes as YAML
 array on `STDOUT`.
 
 ```shell
@@ -37,6 +37,7 @@ echo 'mysecret' | seals aws-kms arn:aws:kms:eu-central-1:000000000000:key/6a0629
   awsKms:
     encryptionAlgorithm: AES_256
     nonce: 1Mjlj3HkLXjH2x/N
+    version: 1
   cipherText: O595N8v+MrHeL6G8jOaS1/yh
   dataEncryptionKey: |-
     AQIDAHhyGbrAGHIA3UUTHqS9CfjLPE3hSeN3A8tabfy8f+NyfwFSFLgzFz1Z08XtFLRVkdfHAAA
@@ -47,19 +48,21 @@ echo 'mysecret' | seals aws-kms arn:aws:kms:eu-central-1:000000000000:key/6a0629
 
 ### Encryption Context - Audience
 
+> See also the [Audience Narrowing](../README.md#audience-narrowing) section in the main README for a security overview.
+
 Optionally, encrypted values can be associated with an
 [Encryption Context](https://docs.aws.amazon.com/kms/latest/developerguide/encrypt_context.html),
-which allows further controll on the audience resp. where such values can be decrypted. When
+which allows further control on the audience resp. where such values can be decrypted. When
 encrypting values the audience can be provided using the below command-line (CLI) flags, each
 CLI flag can be provided multiple times to add multiple audiences.
 
 |CLI flag|Audience|
 |---|---|
-|`--namespace`|Kubernetes [Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/) in which the *SealedSecret* can be decryped|
-|`--name`|Name of the resulting Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) into which the *SealedSecret* can be decryped|
-|`--region`|AWS [Region](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html) in which the *SealedSecret* can be decryped|
-|`--account`|AWS [Account ID](https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-identifiers.html#FindAccountId) in which the *SealedSecret* can be decryped|
-|`--partition`|AWS [Partition](https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/partitions.html) in which the *SealedSecret* can be decryped|
+|`--namespace`|Kubernetes [Namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/) in which the *SealedSecret* can be decrypted|
+|`--name`|Name of the resulting Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) into which the *SealedSecret* can be decrypted|
+|`--region`|AWS [Region](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html) in which the *SealedSecret* can be decrypted|
+|`--account`|AWS [Account ID](https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-identifiers.html#FindAccountId) in which the *SealedSecret* can be decrypted|
+|`--partition`|AWS [Partition](https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/partitions.html) in which the *SealedSecret* can be decrypted|
 
 If no audience constraining encryption context is provided, then the encrypted content can be
 decrypted by all audiences that can use the corresponding KMS Key for decryption operations.
@@ -70,7 +73,7 @@ according to the following rules:
 - `name`: the value of .metadata.name of the SealedSecret instance that it is processing, which is also the name of the Secret that it will create, must match any of the provided names.
 - `region`: the AWS Region of the controller must match any of the provided AWS Regions.
 - `account`: the AWS Account of the controller's IAM Principal (Role) must match any of the provided AWS Accounts.
-- `region`: the AWS Partition of the controller's IAM Principal (Role) must match any of the provided AWS Partitions.
+- `partition`: the AWS Partition of the controller's IAM Principal (Role) must match any of the provided AWS Partitions.
 
 For example to constrain the audience to Kubernetes Namespace `my-namespace` we can encrypted values
 like this:
