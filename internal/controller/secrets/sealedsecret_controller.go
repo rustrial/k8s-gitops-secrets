@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubectl/pkg/util/slice"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -210,7 +210,7 @@ func (r *SealedSecretReconciler) decryptSecret(ctx context.Context, sealedSecret
 						}
 					}
 				} else {
-					if !slice.ContainsString(unauthorizedKeksForKey, value.KeyEncryptionKeyID, nil) {
+					if !slices.Contains(unauthorizedKeksForKey, value.KeyEncryptionKeyID) {
 						unauthorizedKeksForKey = append(unauthorizedKeksForKey, value.KeyEncryptionKeyID)
 					}
 				}
@@ -221,7 +221,7 @@ func (r *SealedSecretReconciler) decryptSecret(ctx context.Context, sealedSecret
 			}
 		}
 		for _, kek := range unauthorizedKeksForKey {
-			if !slice.ContainsString(unauthorizedKeks, kek, nil) {
+			if !slices.Contains(unauthorizedKeks, kek) {
 				unauthorizedKeks = append(unauthorizedKeks, kek)
 			}
 		}
@@ -300,7 +300,7 @@ func (r *SealedSecretReconciler) kekUsageAllowed(keks []secretsv1beta1.KeyEncryp
 		return nil, fmt.Errorf("no KeyEncryptionKeyPolicy found in namespace '%s' for KeyEncryptionKey '%s'", r.ControllerNamespace, envelope.KeyEncryptionKeyID)
 	}
 	for _, kek := range keks {
-		if slice.ContainsString(kek.Spec.Namespaces, secret.Namespace, nil) || slice.ContainsString(kek.Spec.Namespaces, "*", nil) {
+		if slices.Contains(kek.Spec.Namespaces, secret.Namespace) || slices.Contains(kek.Spec.Namespaces, "*") {
 			return &kek, nil
 		}
 	}
